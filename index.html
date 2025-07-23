@@ -646,9 +646,11 @@
             currentRep = e.target.value;
         });
 
-        // Enhanced GPS functionality
+        // Enhanced GPS functionality with better timeout handling
         let watchId = null;
         let currentPosition = null;
+        let gpsRetryCount = 0;
+        const maxRetries = 3;
 
         function initializeGPS() {
             if (!navigator.geolocation) {
@@ -657,44 +659,82 @@
                 return;
             }
 
-            // Request high accuracy location with longer timeout
-            const options = {
+            document.getElementById('currentLocation').textContent = "📍 Getting GPS location...";
+
+            // Start with fast, less accurate location
+            const quickOptions = {
+                enableHighAccuracy: false,
+                timeout: 5000,
+                maximumAge: 60000
+            };
+
+            // Get quick position first
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    currentPosition = position;
+                    updateLocationDisplay(position);
+                    console.log("Quick GPS acquired");
+                    
+                    // Now try for high accuracy
+                    getHighAccuracyLocation();
+                },
+                (error) => {
+                    console.log("Quick GPS failed, trying high accuracy:", error.message);
+                    getHighAccuracyLocation();
+                },
+                quickOptions
+            );
+        }
+
+        function getHighAccuracyLocation() {
+            const accurateOptions = {
                 enableHighAccuracy: true,
-                timeout: 10000,
+                timeout: 15000, // Longer timeout for accurate GPS
                 maximumAge: 30000
             };
 
-            // Get initial position
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     currentPosition = position;
                     updateLocationDisplay(position);
                     startLocationTracking();
+                    console.log("High accuracy GPS acquired");
                 },
                 (error) => {
                     handleLocationError(error);
                 },
-                options
+                accurateOptions
             );
         }
 
         function startLocationTracking() {
-            // Continuously track location for real-time updates
-            const options = {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+
+            // More relaxed tracking options
+            const trackingOptions = {
                 enableHighAccuracy: true,
-                timeout: 5000,
-                maximumAge: 10000
+                timeout: 30000, // Longer timeout for tracking
+                maximumAge: 60000 // Accept positions up to 1 minute old
             };
 
             watchId = navigator.geolocation.watchPosition(
                 (position) => {
                     currentPosition = position;
                     updateLocationDisplay(position);
+                    gpsRetryCount = 0; // Reset retry count on success
                 },
                 (error) => {
                     console.log("Location tracking error:", error);
+                    
+                    // Don't spam error messages for tracking failures
+                    if (gpsRetryCount < maxRetries) {
+                        gpsRetryCount++;
+                        console.log(`GPS retry ${gpsRetryCount}/${maxRetries}`);
+                    }
                 },
-                options
+                trackingOptions
             );
         }
 
@@ -703,14 +743,30 @@
             const lng = position.coords.longitude;
             const accuracy = Math.round(position.coords.accuracy);
             
+            // Show accuracy status with color coding
+            let accuracyColor = "#27ae60"; // Green for good
+            let accuracyText = "Good";
+            
+            if (accuracy > 100) {
+                accuracyColor = "#e74c3c"; // Red for poor
+                accuracyText = "Poor";
+            } else if (accuracy > 50) {
+                accuracyColor = "#f39c12"; // Orange for fair
+                accuracyText = "Fair";
+            }
+            
             document.getElementById('currentLocation').innerHTML = 
-                `📍 GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy}m) <button onclick="requestLocationPermission()" style="margin-left: 10px; padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 12px;">🔄 Refresh</button>`;
+                `📍 GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} 
+                <span style="color: ${accuracyColor};">(±${accuracy}m - ${accuracyText})</span>
+                <button onclick="requestLocationPermission()" style="margin-left: 10px; padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 12px;">🔄 Refresh</button>`;
             
             // Update map with current location
             if (map) {
                 updateMapMarkers();
-                // Center map on user location
-                map.setView([lat, lng], 17);
+                // Only center map on first GPS lock, not every update
+                if (gpsRetryCount === 0) {
+                    map.setView([lat, lng], 17);
+                }
             }
         }
 
