@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Door Tracker - Roofing Sales</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style>
         * {
             margin: 0;
@@ -195,6 +196,50 @@
             border-radius: 6px;
             font-size: 14px;
         }
+        
+        .map-container {
+            height: 300px;
+            margin: 10px 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            position: relative;
+        }
+        
+        .map-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .leaflet-popup-content {
+            font-family: inherit;
+            font-size: 14px;
+        }
+        
+        .popup-buttons {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+        
+        .popup-btn {
+            flex: 1;
+            padding: 6px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -220,6 +265,11 @@
         
         <div class="current-location" id="currentLocation">
             📍 Detecting your location...
+        </div>
+        
+        <div class="map-container">
+            <button class="map-toggle" onclick="toggleMapView()">📋 List View</button>
+            <div id="map" style="height: 100%; width: 100%;"></div>
         </div>
         
         <div class="stats">
@@ -250,28 +300,151 @@
         </button>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
         // Sample data - in real app this would come from a database
         let addresses = [
-            { id: 1, address: "1234 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "" },
-            { id: 2, address: "1236 Oak Street", status: "knocked", rep: "Mike Johnson", timestamp: "2025-07-22 10:30", notes: "Not home" },
-            { id: 3, address: "1238 Oak Street", status: "interested", rep: "Sarah Davis", timestamp: "2025-07-22 11:15", notes: "Call back Thursday" },
-            { id: 4, address: "1240 Oak Street", status: "not-interested", rep: "Mike Johnson", timestamp: "2025-07-22 09:45", notes: "Just got new roof" },
-            { id: 5, address: "1242 Oak Street", status: "not-home", rep: "Tom Wilson", timestamp: "2025-07-22 14:20", notes: "Try evening" },
-            { id: 6, address: "1244 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "" },
-            { id: 7, address: "1246 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "" }
+            { id: 1, address: "1234 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7223, lng: -90.3654 } },
+            { id: 2, address: "1236 Oak Street", status: "knocked", rep: "Mike Johnson", timestamp: "2025-07-22 10:30", notes: "Not home", coordinates: { lat: 38.7225, lng: -90.3656 } },
+            { id: 3, address: "1238 Oak Street", status: "interested", rep: "Sarah Davis", timestamp: "2025-07-22 11:15", notes: "Call back Thursday", coordinates: { lat: 38.7227, lng: -90.3658 } },
+            { id: 4, address: "1240 Oak Street", status: "not-interested", rep: "Mike Johnson", timestamp: "2025-07-22 09:45", notes: "Just got new roof", coordinates: { lat: 38.7229, lng: -90.3660 } },
+            { id: 5, address: "1242 Oak Street", status: "not-home", rep: "Tom Wilson", timestamp: "2025-07-22 14:20", notes: "Try evening", coordinates: { lat: 38.7231, lng: -90.3662 } },
+            { id: 6, address: "1244 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7233, lng: -90.3664 } },
+            { id: 7, address: "1246 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7235, lng: -90.3666 } }
         ];
 
         let currentRep = "";
+        let map = null;
+        let markers = {};
+        let userLocationMarker = null;
+        let isMapView = true;
 
         // Status configurations
         const statusConfig = {
-            unvisited: { icon: "⚪", label: "Not visited", class: "" },
-            knocked: { icon: "🚪", label: "Knocked", class: "knocked" },
-            interested: { icon: "✅", label: "Interested", class: "interested" },
-            "not-interested": { icon: "❌", label: "Not interested", class: "not-interested" },
-            "not-home": { icon: "🏠", label: "Not home", class: "not-home" }
+            unvisited: { icon: "⚪", label: "Not visited", class: "", color: "#95a5a6" },
+            knocked: { icon: "🚪", label: "Knocked", class: "knocked", color: "#3498db" },
+            interested: { icon: "✅", label: "Interested", class: "interested", color: "#27ae60" },
+            "not-interested": { icon: "❌", label: "Not interested", class: "not-interested", color: "#e74c3c" },
+            "not-home": { icon: "🏠", label: "Not home", class: "not-home", color: "#f39c12" }
         };
+
+        function initializeMap() {
+            // Initialize map centered on Olivette, Missouri
+            map = L.map('map').setView([38.7223, -90.3654], 16);
+            
+            // Add street map tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Add all address markers
+            updateMapMarkers();
+        }
+
+        function updateMapMarkers() {
+            if (!map) return;
+            
+            // Clear existing markers
+            Object.values(markers).forEach(marker => map.removeLayer(marker));
+            markers = {};
+            
+            // Add markers for each address
+            addresses.forEach(address => {
+                if (address.coordinates) {
+                    const statusInfo = statusConfig[address.status];
+                    
+                    // Create custom marker
+                    const marker = L.circleMarker([address.coordinates.lat, address.coordinates.lng], {
+                        radius: 8,
+                        fillColor: statusInfo.color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(map);
+                    
+                    // Create popup content
+                    let popupContent = `
+                        <div>
+                            <strong>${address.address}</strong><br>
+                            Status: ${statusInfo.label}<br>
+                    `;
+                    
+                    if (address.rep) {
+                        popupContent += `Rep: ${address.rep}<br>`;
+                    }
+                    if (address.timestamp) {
+                        const date = new Date(address.timestamp);
+                        popupContent += `Time: ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}<br>`;
+                    }
+                    
+                    popupContent += `
+                            <div class="popup-buttons">
+                                <button class="popup-btn knocked" onclick="updateStatusFromMap(${address.id}, 'knocked')" style="background: #3498db;">🚪</button>
+                                <button class="popup-btn interested" onclick="updateStatusFromMap(${address.id}, 'interested')" style="background: #27ae60;">✅</button>
+                                <button class="popup-btn not-interested" onclick="updateStatusFromMap(${address.id}, 'not-interested')" style="background: #e74c3c;">❌</button>
+                                <button class="popup-btn not-home" onclick="updateStatusFromMap(${address.id}, 'not-home')" style="background: #f39c12;">🏠</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    marker.bindPopup(popupContent);
+                    markers[address.id] = marker;
+                }
+            });
+            
+            // Update user location marker
+            if (currentPosition && userLocationMarker) {
+                map.removeLayer(userLocationMarker);
+            }
+            
+            if (currentPosition) {
+                userLocationMarker = L.marker([currentPosition.coords.latitude, currentPosition.coords.longitude], {
+                    icon: L.divIcon({
+                        className: 'user-location-marker',
+                        html: '📍',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    })
+                }).addTo(map);
+                
+                userLocationMarker.bindPopup("Your current location");
+            }
+        }
+
+        function updateStatusFromMap(id, status) {
+            updateStatus(id, status);
+            updateMapMarkers(); // Refresh map colors
+        }
+
+        function toggleMapView() {
+            const mapContainer = document.querySelector('.map-container');
+            const addressList = document.querySelector('.address-list');
+            const toggleBtn = document.querySelector('.map-toggle');
+            
+            if (isMapView) {
+                // Switch to list view
+                mapContainer.style.display = 'none';
+                addressList.style.display = 'block';
+                toggleBtn.textContent = '🗺️ Map View';
+                isMapView = false;
+            } else {
+                // Switch to map view
+                mapContainer.style.display = 'block';
+                addressList.style.display = 'none';
+                toggleBtn.textContent = '📋 List View';
+                isMapView = true;
+                
+                // Refresh map size
+                setTimeout(() => {
+                    if (map) {
+                        map.invalidateSize();
+                        updateMapMarkers();
+                    }
+                }, 100);
+            }
+        }
 
         function updateStats() {
             const knocked = addresses.filter(a => a.status === "knocked" || a.status === "interested" || a.status === "not-interested" || a.status === "not-home").length;
@@ -350,14 +523,17 @@
                 
                 renderAddresses();
                 updateStats();
+                updateMapMarkers();
                 
                 // Show success feedback
                 const button = event.target;
-                const originalText = button.textContent;
-                button.style.transform = 'scale(1.2)';
-                setTimeout(() => {
-                    button.style.transform = 'scale(1)';
-                }, 200);
+                if (button) {
+                    const originalText = button.textContent;
+                    button.style.transform = 'scale(1.2)';
+                    setTimeout(() => {
+                        button.style.transform = 'scale(1)';
+                    }, 200);
+                }
             }
         }
 
@@ -500,6 +676,13 @@
             
             document.getElementById('currentLocation').innerHTML = 
                 `📍 GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy}m) <button onclick="requestLocationPermission()" style="margin-left: 10px; padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 12px;">🔄 Refresh</button>`;
+            
+            // Update map with current location
+            if (map) {
+                updateMapMarkers();
+                // Center map on user location
+                map.setView([lat, lng], 17);
+            }
         }
 
         function handleLocationError(error) {
