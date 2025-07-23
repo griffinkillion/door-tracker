@@ -329,17 +329,46 @@
         };
 
         function initializeMap() {
-            // Initialize map centered on Olivette, Missouri
-            map = L.map('map').setView([38.7223, -90.3654], 16);
-            
-            // Add street map tiles
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                maxZoom: 19
-            }).addTo(map);
-            
-            // Add all address markers
-            updateMapMarkers();
+            // Wait a moment for DOM to be ready
+            setTimeout(() => {
+                try {
+                    // Initialize map centered on GPS location or default
+                    const defaultLat = currentPosition ? currentPosition.coords.latitude : 38.7223;
+                    const defaultLng = currentPosition ? currentPosition.coords.longitude : -90.3654;
+                    
+                    map = L.map('map').setView([defaultLat, defaultLng], 16);
+                    
+                    // Add street map tiles with error handling
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors',
+                        maxZoom: 19,
+                        errorTileUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5NYXAgVGlsZSBFcnJvcjwvdGV4dD48L3N2Zz4='
+                    }).addTo(map);
+                    
+                    // Add all address markers
+                    updateMapMarkers();
+                    
+                    console.log("Map initialized successfully");
+                } catch (error) {
+                    console.error("Map initialization failed:", error);
+                    // Show fallback message
+                    document.getElementById('map').innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f8f9fa; color: #666; text-align: center; padding: 20px;">
+                            <div>
+                                <div style="font-size: 24px; margin-bottom: 10px;">🗺️</div>
+                                <div>Map temporarily unavailable</div>
+                                <div style="font-size: 12px; margin-top: 5px;">Using list view instead</div>
+                                <button onclick="retryMapLoad()" style="margin-top: 10px; padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">🔄 Retry</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }, 500);
+        }
+
+        function retryMapLoad() {
+            document.getElementById('map').innerHTML = '';
+            initializeMap();
         }
 
         function updateMapMarkers() {
