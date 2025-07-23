@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Door Tracker - Roofing Sales</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .search-bar {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        .search-input:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .current-location {
+            padding: 15px 20px;
+            background: #e8f5e8;
+            border-left: 4px solid #27ae60;
+            margin: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #2d5a2d;
+        }
+        
+        .address-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .address-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s ease;
+        }
+        
+        .address-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .address-info {
+            flex: 1;
+        }
+        
+        .address-text {
+            font-weight: 500;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+        
+        .address-status {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        
+        .status-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .status-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .status-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .knocked { background: #3498db; color: white; }
+        .interested { background: #27ae60; color: white; }
+        .not-interested { background: #e74c3c; color: white; }
+        .not-home { background: #f39c12; color: white; }
+        
+        .stats {
+            padding: 20px;
+            background: #f8f9fa;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 4px;
+        }
+        
+        .add-address {
+            margin: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: calc(100% - 40px);
+        }
+        
+        .add-address:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(46, 204, 113, 0.3);
+        }
+        
+        .rep-selector {
+            padding: 10px 20px;
+            background: #fff3cd;
+            border-bottom: 1px solid #ffeaa7;
+        }
+        
+        .rep-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Door Tracker</h1>
+            <p>Smart territory management for roofing sales</p>
+        </div>
+        
+        <div class="rep-selector">
+            <select class="rep-select" id="repSelect">
+                <option value="">Select Sales Rep</option>
+                <option value="Mike Johnson">Mike Johnson</option>
+                <option value="Sarah Davis">Sarah Davis</option>
+                <option value="Tom Wilson">Tom Wilson</option>
+                <option value="Lisa Chen">Lisa Chen</option>
+            </select>
+        </div>
+        
+        <div class="search-bar">
+            <input type="text" class="search-input" placeholder="Search address or street name..." id="searchInput">
+        </div>
+        
+        <div class="current-location" id="currentLocation">
+            📍 Detecting your location...
+        </div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="knockedCount">0</div>
+                <div class="stat-label">Doors Knocked</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="interestedCount">0</div>
+                <div class="stat-label">Interested</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="totalCount">0</div>
+                <div class="stat-label">Total Addresses</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="completionRate">0%</div>
+                <div class="stat-label">Coverage</div>
+            </div>
+        </div>
+        
+        <div class="address-list" id="addressList">
+            <!-- Addresses will be populated here -->
+        </div>
+        
+        <button class="add-address" onclick="addCurrentAddress()">
+            ➕ Add Current Location
+        </button>
+    </div>
+
+    <script>
+        // Sample data - in real app this would come from a database
+        let addresses = [
+            { id: 1, address: "1234 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "" },
+            { id: 2, address: "1236 Oak Street", status: "knocked", rep: "Mike Johnson", timestamp: "2025-07-22 10:30", notes: "Not home" },
+            { id: 3, address: "1238 Oak Street", status: "interested", rep: "Sarah Davis", timestamp: "2025-07-22 11:15", notes: "Call back Thursday" },
+            { id: 4, address: "1240 Oak Street", status: "not-interested", rep: "Mike Johnson", timestamp: "2025-07-22 09:45", notes: "Just got new roof" },
+            { id: 5, address: "1242 Oak Street", status: "not-home", rep: "Tom Wilson", timestamp: "2025-07-22 14:20", notes: "Try evening" },
+            { id: 6, address: "1244 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "" },
+            { id: 7, address: "1246 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "" }
+        ];
+
+        let currentRep = "";
+
+        // Status configurations
+        const statusConfig = {
+            unvisited: { icon: "⚪", label: "Not visited", class: "" },
+            knocked: { icon: "🚪", label: "Knocked", class: "knocked" },
+            interested: { icon: "✅", label: "Interested", class: "interested" },
+            "not-interested": { icon: "❌", label: "Not interested", class: "not-interested" },
+            "not-home": { icon: "🏠", label: "Not home", class: "not-home" }
+        };
+
+        function updateStats() {
+            const knocked = addresses.filter(a => a.status === "knocked" || a.status === "interested" || a.status === "not-interested" || a.status === "not-home").length;
+            const interested = addresses.filter(a => a.status === "interested").length;
+            const total = addresses.length;
+            const completion = total > 0 ? Math.round((knocked / total) * 100) : 0;
+            
+            document.getElementById('knockedCount').textContent = knocked;
+            document.getElementById('interestedCount').textContent = interested;
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('completionRate').textContent = completion + '%';
+        }
+
+        function renderAddresses(filteredAddresses = addresses) {
+            const listContainer = document.getElementById('addressList');
+            listContainer.innerHTML = '';
+
+            filteredAddresses.forEach(address => {
+                const statusInfo = statusConfig[address.status];
+                const div = document.createElement('div');
+                div.className = 'address-item';
+                
+                let statusText = statusInfo.label;
+                if (address.rep) {
+                    statusText += ` (${address.rep})`;
+                }
+                if (address.timestamp) {
+                    const date = new Date(address.timestamp);
+                    statusText += ` - ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                }
+                
+                // Add distance if we have current location and address coordinates
+                let distanceText = "";
+                if (currentPosition && address.coordinates) {
+                    const distance = calculateDistance(
+                        currentPosition.coords.latitude,
+                        currentPosition.coords.longitude,
+                        address.coordinates.lat,
+                        address.coordinates.lng
+                    );
+                    if (distance < 1000) {
+                        distanceText = ` • ${Math.round(distance)}m away`;
+                    } else {
+                        distanceText = ` • ${(distance/1000).toFixed(1)}km away`;
+                    }
+                }
+                
+                div.innerHTML = `
+                    <div class="address-info">
+                        <div class="address-text">${statusInfo.icon} ${address.address}</div>
+                        <div class="address-status">${statusText}${distanceText}</div>
+                    </div>
+                    <div class="status-buttons">
+                        <button class="status-btn knocked" onclick="updateStatus(${address.id}, 'knocked')" title="Knocked">🚪</button>
+                        <button class="status-btn interested" onclick="updateStatus(${address.id}, 'interested')" title="Interested">✅</button>
+                        <button class="status-btn not-interested" onclick="updateStatus(${address.id}, 'not-interested')" title="Not Interested">❌</button>
+                        <button class="status-btn not-home" onclick="updateStatus(${address.id}, 'not-home')" title="Not Home">🏠</button>
+                    </div>
+                `;
+                
+                listContainer.appendChild(div);
+            });
+        }
+
+        function updateStatus(id, status) {
+            if (!currentRep) {
+                alert("Please select a sales rep first!");
+                return;
+            }
+            
+            const address = addresses.find(a => a.id === id);
+            if (address) {
+                address.status = status;
+                address.rep = currentRep;
+                address.timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+                
+                renderAddresses();
+                updateStats();
+                
+                // Show success feedback
+                const button = event.target;
+                const originalText = button.textContent;
+                button.style.transform = 'scale(1.2)';
+                setTimeout(() => {
+                    button.style.transform = 'scale(1)';
+                }, 200);
+            }
+        }
+
+        function addCurrentAddress() {
+            if (!currentRep) {
+                alert("Please select a sales rep first!");
+                return;
+            }
+            
+            if (!currentPosition) {
+                alert("GPS location not available. Please enable location access and try again.");
+                requestLocationPermission();
+                return;
+            }
+            
+            const lat = currentPosition.coords.latitude;
+            const lng = currentPosition.coords.longitude;
+            const accuracy = Math.round(currentPosition.coords.accuracy);
+            
+            // Reverse geocode to get actual address (simulated)
+            reverseGeocode(lat, lng).then(address => {
+                const newAddress = {
+                    id: Date.now(),
+                    address: address,
+                    status: "unvisited",
+                    rep: "",
+                    timestamp: null,
+                    notes: "",
+                    coordinates: { lat, lng, accuracy }
+                };
+                
+                addresses.unshift(newAddress);
+                renderAddresses();
+                updateStats();
+                
+                alert(`✅ "${address}" added with GPS coordinates!\nAccuracy: ±${accuracy} meters`);
+            });
+        }
+
+        // Simulated reverse geocoding (in real app, use Google Maps API)
+        async function reverseGeocode(lat, lng) {
+            // This simulates looking up the address from coordinates
+            // In production, you'd use: https://maps.googleapis.com/maps/api/geocode/json
+            
+            const baseNumbers = [1200, 1300, 1400, 1500, 1600];
+            const streets = ["Oak Street", "Maple Avenue", "Pine Road", "Cedar Lane", "Birch Drive"];
+            
+            const streetIndex = Math.floor(Math.abs(lat * lng * 1000) % streets.length);
+            const baseNumber = baseNumbers[Math.floor(Math.abs(lat * lng * 100) % baseNumbers.length)];
+            const houseNumber = baseNumber + Math.floor(Math.abs(lat * lng * 10) % 50) * 2;
+            
+            return `${houseNumber} ${streets[streetIndex]}`;
+        }
+
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lng2-lng1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c; // Distance in meters
+        }
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filtered = addresses.filter(address => 
+                address.address.toLowerCase().includes(searchTerm)
+            );
+            renderAddresses(filtered);
+        });
+
+        // Rep selection
+        document.getElementById('repSelect').addEventListener('change', (e) => {
+            currentRep = e.target.value;
+        });
+
+        // Enhanced GPS functionality
+        let watchId = null;
+        let currentPosition = null;
+
+        function initializeGPS() {
+            if (!navigator.geolocation) {
+                document.getElementById('currentLocation').innerHTML = 
+                    "❌ GPS not supported by this device";
+                return;
+            }
+
+            // Request high accuracy location with longer timeout
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 30000
+            };
+
+            // Get initial position
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    currentPosition = position;
+                    updateLocationDisplay(position);
+                    startLocationTracking();
+                },
+                (error) => {
+                    handleLocationError(error);
+                },
+                options
+            );
+        }
+
+        function startLocationTracking() {
+            // Continuously track location for real-time updates
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 10000
+            };
+
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    currentPosition = position;
+                    updateLocationDisplay(position);
+                },
+                (error) => {
+                    console.log("Location tracking error:", error);
+                },
+                options
+            );
+        }
+
+        function updateLocationDisplay(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = Math.round(position.coords.accuracy);
+            
+            document.getElementById('currentLocation').innerHTML = 
+                `📍 GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} (±${accuracy}m) <button onclick="requestLocationPermission()" style="margin-left: 10px; padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 12px;">🔄 Refresh</button>`;
+        }
+
+        function handleLocationError(error) {
+            let message = "";
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "❌ Location access denied. ";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "❌ Location unavailable. ";
+                    break;
+                case error.TIMEOUT:
+                    message = "❌ Location timeout. ";
+                    break;
+                default:
+                    message = "❌ Unknown location error. ";
+                    break;
+            }
+            
+            document.getElementById('currentLocation').innerHTML = 
+                message + `<button onclick="requestLocationPermission()" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 12px;">🔄 Enable GPS</button>`;
+        }
+
+        function requestLocationPermission() {
+            document.getElementById('currentLocation').textContent = "📍 Requesting GPS access...";
+            initializeGPS();
+        }
+
+        // Initialize GPS on page load
+        initializeGPS();
+
+        // Initialize
+        renderAddresses();
+        updateStats();
+    </script>
+</body>
+</html>
