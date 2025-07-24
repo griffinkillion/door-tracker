@@ -567,7 +567,7 @@
 
     <script>
         // Google Maps API Configuration
-       const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM"; // Replace with actual API key
+        const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM"; // Replace with actual API key
         
         // Global variables
         let map = null;
@@ -579,9 +579,6 @@
         let addresses = [
             // Start with empty list - addresses will be added by clicking on map
         ];
-
-        // Initialize currentRep before using it
-        let currentRep = "";
 
         // Status configurations
         const statusConfig = {
@@ -938,9 +935,6 @@
             }
         }
 
-        // Initialize variables first
-        let currentRep = "";
-
         function updateStats() {
             if (!currentRep) {
                 // Hide stats if no rep selected
@@ -1087,6 +1081,47 @@
 
         function addCurrentAddress() {
             switchToMapView();
+        }
+
+        function switchToMapView() {
+            // Update toggle buttons
+            document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.toggle-btn')[1].classList.add('active');
+            
+            // Show map, hide list
+            document.getElementById('mapContainer').style.display = 'block';
+            document.getElementById('addressList').style.display = 'none';
+            
+            // Initialize or refresh map
+            if (!map) {
+                console.log("Loading Google Maps for first time...");
+                loadGoogleMaps();
+            } else {
+                console.log("Refreshing existing Google Map...");
+                // If we have GPS now, recenter the map
+                if (currentPosition) {
+                    console.log("Recentering map to GPS location");
+                    map.setCenter({ 
+                        lat: currentPosition.coords.latitude, 
+                        lng: currentPosition.coords.longitude 
+                    });
+                    map.setZoom(18);
+                }
+                setTimeout(() => {
+                    google.maps.event.trigger(map, 'resize');
+                    updateGoogleMapMarkers();
+                }, 100);
+            }
+        }
+
+        function switchToListView() {
+            // Update toggle buttons
+            document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.toggle-btn')[0].classList.add('active');
+            
+            // Show list, hide map
+            document.getElementById('mapContainer').style.display = 'none';
+            document.getElementById('addressList').style.display = 'block';
         }
 
         // Real reverse geocoding using Google Maps API
