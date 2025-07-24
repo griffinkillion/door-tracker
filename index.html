@@ -390,14 +390,7 @@
                     center: { lat: defaultLat, lng: defaultLng },
                     zoom: currentPosition ? 18 : 16, // Zoom in more if we have GPS
                     mapTypeId: 'roadmap',
-                    mapId: 'DOOR_TRACKER_MAP', // Required for Advanced Markers
-                    styles: [
-                        {
-                            featureType: 'poi',
-                            elementType: 'labels',
-                            stylers: [{ visibility: 'off' }]
-                        }
-                    ]
+                    mapId: 'DOOR_TRACKER_MAP' // Required for Advanced Markers
                 });
                 
                 // Add click listener to map for adding addresses
@@ -812,8 +805,7 @@
                 
                 return new Promise((resolve, reject) => {
                     geocoder.geocode({ 
-                        location: { lat, lng },
-                        result_type: ['street_address', 'premise']
+                        location: { lat, lng }
                     }, (results, status) => {
                         console.log("Geocoding status:", status);
                         console.log("Geocoding results:", results);
