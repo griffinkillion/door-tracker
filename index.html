@@ -328,7 +328,7 @@
 
     <script>
         // Google Maps API Configuration
-        const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM"; // Replace with actual API key
+        const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM";
         
         // Global variables
         let map = null;
@@ -338,13 +338,7 @@
         let googleMapsLoaded = false;
         // Sample data - in real app this would come from a database
         let addresses = [
-            { id: 1, address: "1234 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7223, lng: -90.3654 } },
-            { id: 2, address: "1236 Oak Street", status: "knocked", rep: "Mike Johnson", timestamp: "2025-07-22 10:30", notes: "Not home", coordinates: { lat: 38.7225, lng: -90.3656 } },
-            { id: 3, address: "1238 Oak Street", status: "interested", rep: "Sarah Davis", timestamp: "2025-07-22 11:15", notes: "Call back Thursday", coordinates: { lat: 38.7227, lng: -90.3658 } },
-            { id: 4, address: "1240 Oak Street", status: "not-interested", rep: "Mike Johnson", timestamp: "2025-07-22 09:45", notes: "Just got new roof", coordinates: { lat: 38.7229, lng: -90.3660 } },
-            { id: 5, address: "1242 Oak Street", status: "not-home", rep: "Tom Wilson", timestamp: "2025-07-22 14:20", notes: "Try evening", coordinates: { lat: 38.7231, lng: -90.3662 } },
-            { id: 6, address: "1244 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7233, lng: -90.3664 } },
-            { id: 7, address: "1246 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7235, lng: -90.3666 } }
+            // Start with empty list - addresses will be added by clicking on map
         ];
 
         // Status configurations
@@ -377,13 +371,20 @@
         function initializeGoogleMap() {
             try {
                 console.log("Initializing Google Map...");
+                console.log("Current position available:", !!currentPosition);
                 
                 // Use current GPS location if available, otherwise use default
-                const defaultLat = currentPosition ? currentPosition.coords.latitude : 38.602983;
-                const defaultLng = currentPosition ? currentPosition.coords.longitude : -90.379812;
+                let defaultLat, defaultLng;
                 
-                console.log("Map center coordinates:", defaultLat, defaultLng);
-                console.log("Using GPS location:", !!currentPosition);
+                if (currentPosition) {
+                    defaultLat = currentPosition.coords.latitude;
+                    defaultLng = currentPosition.coords.longitude;
+                    console.log("Using real GPS coordinates:", defaultLat, defaultLng);
+                } else {
+                    defaultLat = 38.602983;
+                    defaultLng = -90.379812;
+                    console.log("Using fallback coordinates (no GPS):", defaultLat, defaultLng);
+                }
                 
                 map = new google.maps.Map(document.getElementById('map'), {
                     center: { lat: defaultLat, lng: defaultLng },
@@ -575,7 +576,7 @@
                 }
             });
             
-            // Add user location marker
+            // Add user location marker - ONLY if we have real GPS
             if (currentPosition && userLocationMarker) {
                 if (userLocationMarker.map) {
                     userLocationMarker.map = null;
@@ -585,6 +586,8 @@
             }
             
             if (currentPosition && window.google) {
+                console.log("Adding user location marker at:", currentPosition.coords.latitude, currentPosition.coords.longitude);
+                
                 if (useAdvancedMarkers) {
                     try {
                         // New advanced marker for user location
@@ -603,7 +606,7 @@
                             },
                             map: map,
                             content: userPinElement.element,
-                            title: 'Your Location'
+                            title: 'Your Current Location'
                         });
                     } catch (error) {
                         console.warn("Advanced user marker failed, using legacy:", error);
@@ -623,17 +626,19 @@
                             url: 'http://maps.google.com/mapfiles/ms/icons/blue-pushpin.png',
                             scaledSize: new google.maps.Size(40, 40)
                         },
-                        title: 'Your Location'
+                        title: 'Your Current Location'
                     });
                 }
                 
                 const userInfoWindow = new google.maps.InfoWindow({
-                    content: '<div style="padding: 5px;"><strong>Your Current Location</strong></div>'
+                    content: '<div style="padding: 5px;"><strong>Your Current Location</strong><br><small>GPS Accuracy: ±' + Math.round(currentPosition.coords.accuracy) + 'm</small></div>'
                 });
                 
                 userLocationMarker.addListener('click', () => {
                     userInfoWindow.open(map, userLocationMarker);
                 });
+            } else {
+                console.log("No current position available for user marker");
             }
         }
 
