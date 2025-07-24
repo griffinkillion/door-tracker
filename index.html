@@ -507,26 +507,40 @@
             const addressList = document.querySelector('.address-list');
             const toggleBtn = document.querySelector('.map-toggle');
             
+            console.log("Toggle button clicked", {mapContainer, addressList, toggleBtn, isMapView});
+            
+            if (!mapContainer || !addressList || !toggleBtn) {
+                console.error("UI elements missing for toggle");
+                return;
+            }
+            
             if (isMapView) {
                 // Switch to list view
                 mapContainer.style.display = 'none';
                 addressList.style.display = 'block';
                 toggleBtn.textContent = '🗺️ Map View';
                 isMapView = false;
+                console.log("Switched to list view");
             } else {
                 // Switch to map view
                 mapContainer.style.display = 'block';
                 addressList.style.display = 'none';
                 toggleBtn.textContent = '📋 List View';
                 isMapView = true;
+                console.log("Switched to map view");
                 
-                // Refresh map size
-                setTimeout(() => {
-                    if (map) {
+                // Initialize or refresh map
+                if (!map) {
+                    console.log("Map not initialized, creating it now...");
+                    initializeMap();
+                } else {
+                    // Refresh map size
+                    setTimeout(() => {
+                        console.log("Refreshing existing map...");
                         map.invalidateSize();
                         updateMapMarkers();
-                    }
-                }, 100);
+                    }, 100);
+                }
             }
         }
 
