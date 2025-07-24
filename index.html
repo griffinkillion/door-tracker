@@ -322,7 +322,7 @@
         </div>
         
         <button class="add-address" onclick="addCurrentAddress()">
-            ➕ Add Current Location
+            💡 Click Houses on Map to Add
         </button>
     </div>
 
@@ -398,7 +398,52 @@
                     ]
                 });
                 
-                console.log("Google Map initialized successfully");
+                // Add click listener to map for adding addresses
+                map.addListener('click', (event) => {
+                    if (!currentRep) {
+                        alert("Please select a sales rep first!");
+                        return;
+                    }
+                    
+                    const lat = event.latLng.lat();
+                    const lng = event.latLng.lng();
+                    
+                    console.log("Map clicked at:", lat, lng);
+                    
+                    // Show loading message
+                    const loadingDiv = document.createElement('div');
+                    loadingDiv.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        background: white;
+                        padding: 20px;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                        z-index: 10000;
+                        text-align: center;
+                    `;
+                    loadingDiv.innerHTML = '🏠 Getting address...<br><small>Please wait</small>';
+                    document.body.appendChild(loadingDiv);
+                    
+                    // Get real address from coordinates
+                    reverseGeocodeReal(lat, lng).then(address => {
+                        document.body.removeChild(loadingDiv);
+                        
+                        if (address) {
+                            addAddressAtLocation(lat, lng, address);
+                        } else {
+                            alert("Could not get address for this location. Try clicking closer to a house.");
+                        }
+                    }).catch(error => {
+                        document.body.removeChild(loadingDiv);
+                        console.error("Geocoding error:", error);
+                        alert("Error getting address. Please try again.");
+                    });
+                });
+                
+                console.log("Google Map initialized successfully with click handler");
                 updateGoogleMapMarkers();
                 
                 // Hide API notice and show map
@@ -656,54 +701,60 @@
         }
 
         function addCurrentAddress() {
-            if (!currentRep) {
-                alert("Please select a sales rep first!");
-                return;
-            }
-            
-            if (!currentPosition) {
-                alert("GPS location not available. Please enable location access and try again.");
-                requestLocationPermission();
-                return;
-            }
-            
-            const lat = currentPosition.coords.latitude;
-            const lng = currentPosition.coords.longitude;
-            const accuracy = Math.round(currentPosition.coords.accuracy);
-            
-            // Reverse geocode to get actual address (simulated)
-            reverseGeocode(lat, lng).then(address => {
-                const newAddress = {
-                    id: Date.now(),
-                    address: address,
-                    status: "unvisited",
-                    rep: "",
-                    timestamp: null,
-                    notes: "",
-                    coordinates: { lat, lng, accuracy }
-                };
-                
-                addresses.unshift(newAddress);
-                renderAddresses();
-                updateStats();
-                
-                alert(`✅ "${address}" added with GPS coordinates!\nAccuracy: ±${accuracy} meters`);
-            });
+            alert("💡 To add addresses, click directly on houses in Map View!\n\n1. Switch to Map View\n2. Click on any house\n3. We'll get the real address automatically");
         }
 
-        // Simulated reverse geocoding (in real app, use Google Maps API)
-        async function reverseGeocode(lat, lng) {
-            // This simulates looking up the address from coordinates
-            // In production, you'd use: https://maps.googleapis.com/maps/api/geocode/json
+        // Real reverse geocoding using Google Maps API
+        async function reverseGeocodeReal(lat, lng) {
+            try {
+                const geocoder = new google.maps.Geocoder();
+                
+                return new Promise((resolve, reject) => {
+                    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            // Get the most specific address (usually the first result)
+                            const address = results[0].formatted_address;
+                            console.log("Geocoded address:", address);
+                            resolve(address);
+                        } else {
+                            console.error("Geocoding failed:", status);
+                            reject(new Error("Geocoding failed"));
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error("Geocoding error:", error);
+                return null;
+            }
+        }
+
+        function addAddressAtLocation(lat, lng, address) {
+            // Check if address already exists
+            const existingAddress = addresses.find(a => 
+                a.address.toLowerCase() === address.toLowerCase()
+            );
             
-            const baseNumbers = [1200, 1300, 1400, 1500, 1600];
-            const streets = ["Oak Street", "Maple Avenue", "Pine Road", "Cedar Lane", "Birch Drive"];
+            if (existingAddress) {
+                alert(`"${address}" is already in your list!`);
+                return;
+            }
             
-            const streetIndex = Math.floor(Math.abs(lat * lng * 1000) % streets.length);
-            const baseNumber = baseNumbers[Math.floor(Math.abs(lat * lng * 100) % baseNumbers.length)];
-            const houseNumber = baseNumber + Math.floor(Math.abs(lat * lng * 10) % 50) * 2;
+            const newAddress = {
+                id: Date.now(),
+                address: address,
+                status: "unvisited",
+                rep: "",
+                timestamp: null,
+                notes: "",
+                coordinates: { lat, lng, accuracy: 5 } // High accuracy since manually clicked
+            };
             
-            return `${houseNumber} ${streets[streetIndex]}`;
+            addresses.unshift(newAddress);
+            renderAddresses();
+            updateStats();
+            updateGoogleMapMarkers();
+            
+            alert(`✅ "${address}" added successfully!`);
         }
 
         function calculateDistance(lat1, lng1, lat2, lng2) {
