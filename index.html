@@ -567,7 +567,7 @@
 
     <script>
         // Google Maps API Configuration
-        const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM"; // Replace with actual API key
+       const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM"; // Replace with actual API key
         
         // Global variables
         let map = null;
@@ -579,6 +579,9 @@
         let addresses = [
             // Start with empty list - addresses will be added by clicking on map
         ];
+
+        // Initialize currentRep before using it
+        let currentRep = "";
 
         // Status configurations
         const statusConfig = {
@@ -934,6 +937,9 @@
                 }
             }
         }
+
+        // Initialize variables first
+        let currentRep = "";
 
         function updateStats() {
             if (!currentRep) {
