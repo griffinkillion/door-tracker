@@ -389,6 +389,7 @@
                     center: { lat: defaultLat, lng: defaultLng },
                     zoom: currentPosition ? 18 : 16, // Zoom in more if we have GPS
                     mapTypeId: 'roadmap',
+                    mapId: 'DOOR_TRACKER_MAP', // Required for Advanced Markers
                     styles: [
                         {
                             featureType: 'poi',
@@ -477,11 +478,18 @@
             Object.values(markers).forEach(marker => {
                 if (marker.map) {
                     marker.map = null; // Remove AdvancedMarkerElement
-                } else {
+                } else if (marker.setMap) {
                     marker.setMap(null); // Remove legacy Marker
                 }
             });
             markers = {};
+            
+            // Check if Advanced Markers are available and working
+            const useAdvancedMarkers = window.google.maps.marker && 
+                                     window.google.maps.marker.AdvancedMarkerElement &&
+                                     map.getMapId();
+            
+            console.log("Using Advanced Markers:", useAdvancedMarkers);
             
             // Add markers for each address
             addresses.forEach(address => {
@@ -490,24 +498,30 @@
                     
                     let marker;
                     
-                    // Try to use new AdvancedMarkerElement if available
-                    if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
-                        // Create custom pin element
-                        const pinElement = new google.maps.marker.PinElement({
-                            background: statusInfo.color,
-                            borderColor: '#FFFFFF',
-                            glyphColor: '#FFFFFF',
-                            scale: 1.2
-                        });
-                        
-                        marker = new google.maps.marker.AdvancedMarkerElement({
-                            position: { lat: address.coordinates.lat, lng: address.coordinates.lng },
-                            map: map,
-                            content: pinElement.element,
-                            title: address.address
-                        });
-                    } else {
-                        // Fallback to legacy markers
+                    if (useAdvancedMarkers) {
+                        try {
+                            // Create custom pin element
+                            const pinElement = new google.maps.marker.PinElement({
+                                background: statusInfo.color,
+                                borderColor: '#FFFFFF',
+                                glyphColor: '#FFFFFF',
+                                scale: 1.2
+                            });
+                            
+                            marker = new google.maps.marker.AdvancedMarkerElement({
+                                position: { lat: address.coordinates.lat, lng: address.coordinates.lng },
+                                map: map,
+                                content: pinElement.element,
+                                title: address.address
+                            });
+                        } catch (error) {
+                            console.warn("Advanced Marker creation failed, using legacy:", error);
+                            useAdvancedMarkers = false;
+                        }
+                    }
+                    
+                    if (!useAdvancedMarkers) {
+                        // Use legacy markers
                         marker = new google.maps.Marker({
                             position: { lat: address.coordinates.lat, lng: address.coordinates.lng },
                             map: map,
@@ -565,32 +579,39 @@
             if (currentPosition && userLocationMarker) {
                 if (userLocationMarker.map) {
                     userLocationMarker.map = null;
-                } else {
+                } else if (userLocationMarker.setMap) {
                     userLocationMarker.setMap(null);
                 }
             }
             
             if (currentPosition && window.google) {
-                if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
-                    // New advanced marker for user location
-                    const userPinElement = new google.maps.marker.PinElement({
-                        background: '#4285f4',
-                        borderColor: '#FFFFFF',
-                        glyphColor: '#FFFFFF',
-                        glyph: '📍',
-                        scale: 1.5
-                    });
-                    
-                    userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
-                        position: { 
-                            lat: currentPosition.coords.latitude, 
-                            lng: currentPosition.coords.longitude 
-                        },
-                        map: map,
-                        content: userPinElement.element,
-                        title: 'Your Location'
-                    });
-                } else {
+                if (useAdvancedMarkers) {
+                    try {
+                        // New advanced marker for user location
+                        const userPinElement = new google.maps.marker.PinElement({
+                            background: '#4285f4',
+                            borderColor: '#FFFFFF',
+                            glyphColor: '#FFFFFF',
+                            glyph: '📍',
+                            scale: 1.5
+                        });
+                        
+                        userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
+                            position: { 
+                                lat: currentPosition.coords.latitude, 
+                                lng: currentPosition.coords.longitude 
+                            },
+                            map: map,
+                            content: userPinElement.element,
+                            title: 'Your Location'
+                        });
+                    } catch (error) {
+                        console.warn("Advanced user marker failed, using legacy:", error);
+                        useAdvancedMarkers = false;
+                    }
+                }
+                
+                if (!useAdvancedMarkers) {
                     // Fallback to legacy marker
                     userLocationMarker = new google.maps.Marker({
                         position: { 
