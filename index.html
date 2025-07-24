@@ -366,7 +366,7 @@
             if (googleMapsLoaded) return;
             
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initializeGoogleMap`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initializeGoogleMap&libraries=marker`;
             script.async = true;
             script.defer = true;
             document.head.appendChild(script);
@@ -431,15 +431,30 @@
                     reverseGeocodeReal(lat, lng).then(address => {
                         document.body.removeChild(loadingDiv);
                         
-                        if (address) {
+                        console.log("Final address result:", address);
+                        
+                        if (address && address !== `${lat.toFixed(6)}, ${lng.toFixed(6)}`) {
                             addAddressAtLocation(lat, lng, address);
                         } else {
-                            alert("Could not get address for this location. Try clicking closer to a house.");
+                            // If geocoding failed, let user enter address manually
+                            const userAddress = prompt(`Geocoding failed. Please enter the address for this location:\n\nCoordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                            if (userAddress && userAddress.trim()) {
+                                addAddressAtLocation(lat, lng, userAddress.trim());
+                            } else {
+                                alert("No address entered. Location not added.");
+                            }
                         }
                     }).catch(error => {
                         document.body.removeChild(loadingDiv);
                         console.error("Geocoding error:", error);
-                        alert("Error getting address. Please try again.");
+                        
+                        // Fallback to manual entry
+                        const userAddress = prompt(`Error getting address. Please enter manually:\n\nCoordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+                        if (userAddress && userAddress.trim()) {
+                            addAddressAtLocation(lat, lng, userAddress.trim());
+                        } else {
+                            alert("No address entered. Location not added.");
+                        }
                     });
                 });
                 
@@ -459,7 +474,13 @@
             if (!map || !window.google) return;
             
             // Clear existing markers
-            Object.values(markers).forEach(marker => marker.setMap(null));
+            Object.values(markers).forEach(marker => {
+                if (marker.map) {
+                    marker.map = null; // Remove AdvancedMarkerElement
+                } else {
+                    marker.setMap(null); // Remove legacy Marker
+                }
+            });
             markers = {};
             
             // Add markers for each address
@@ -467,15 +488,36 @@
                 if (address.coordinates) {
                     const statusInfo = statusConfig[address.status];
                     
-                    const marker = new google.maps.Marker({
-                        position: { lat: address.coordinates.lat, lng: address.coordinates.lng },
-                        map: map,
-                        icon: {
-                            url: statusInfo.mapIcon,
-                            scaledSize: new google.maps.Size(32, 32)
-                        },
-                        title: address.address
-                    });
+                    let marker;
+                    
+                    // Try to use new AdvancedMarkerElement if available
+                    if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
+                        // Create custom pin element
+                        const pinElement = new google.maps.marker.PinElement({
+                            background: statusInfo.color,
+                            borderColor: '#FFFFFF',
+                            glyphColor: '#FFFFFF',
+                            scale: 1.2
+                        });
+                        
+                        marker = new google.maps.marker.AdvancedMarkerElement({
+                            position: { lat: address.coordinates.lat, lng: address.coordinates.lng },
+                            map: map,
+                            content: pinElement.element,
+                            title: address.address
+                        });
+                    } else {
+                        // Fallback to legacy markers
+                        marker = new google.maps.Marker({
+                            position: { lat: address.coordinates.lat, lng: address.coordinates.lng },
+                            map: map,
+                            icon: {
+                                url: statusInfo.mapIcon,
+                                scaledSize: new google.maps.Size(32, 32)
+                            },
+                            title: address.address
+                        });
+                    }
                     
                     // Create info window content
                     let infoContent = `
@@ -521,22 +563,48 @@
             
             // Add user location marker
             if (currentPosition && userLocationMarker) {
-                userLocationMarker.setMap(null);
+                if (userLocationMarker.map) {
+                    userLocationMarker.map = null;
+                } else {
+                    userLocationMarker.setMap(null);
+                }
             }
             
             if (currentPosition && window.google) {
-                userLocationMarker = new google.maps.Marker({
-                    position: { 
-                        lat: currentPosition.coords.latitude, 
-                        lng: currentPosition.coords.longitude 
-                    },
-                    map: map,
-                    icon: {
-                        url: 'http://maps.google.com/mapfiles/ms/icons/blue-pushpin.png',
-                        scaledSize: new google.maps.Size(40, 40)
-                    },
-                    title: 'Your Location'
-                });
+                if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
+                    // New advanced marker for user location
+                    const userPinElement = new google.maps.marker.PinElement({
+                        background: '#4285f4',
+                        borderColor: '#FFFFFF',
+                        glyphColor: '#FFFFFF',
+                        glyph: '📍',
+                        scale: 1.5
+                    });
+                    
+                    userLocationMarker = new google.maps.marker.AdvancedMarkerElement({
+                        position: { 
+                            lat: currentPosition.coords.latitude, 
+                            lng: currentPosition.coords.longitude 
+                        },
+                        map: map,
+                        content: userPinElement.element,
+                        title: 'Your Location'
+                    });
+                } else {
+                    // Fallback to legacy marker
+                    userLocationMarker = new google.maps.Marker({
+                        position: { 
+                            lat: currentPosition.coords.latitude, 
+                            lng: currentPosition.coords.longitude 
+                        },
+                        map: map,
+                        icon: {
+                            url: 'http://maps.google.com/mapfiles/ms/icons/blue-pushpin.png',
+                            scaledSize: new google.maps.Size(40, 40)
+                        },
+                        title: 'Your Location'
+                    });
+                }
                 
                 const userInfoWindow = new google.maps.InfoWindow({
                     content: '<div style="padding: 5px;"><strong>Your Current Location</strong></div>'
@@ -707,24 +775,56 @@
         // Real reverse geocoding using Google Maps API
         async function reverseGeocodeReal(lat, lng) {
             try {
+                console.log("Starting geocoding for:", lat, lng);
+                
+                if (!window.google || !window.google.maps || !window.google.maps.Geocoder) {
+                    console.error("Google Maps Geocoder not available");
+                    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                }
+                
                 const geocoder = new google.maps.Geocoder();
                 
                 return new Promise((resolve, reject) => {
-                    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-                        if (status === 'OK' && results[0]) {
-                            // Get the most specific address (usually the first result)
-                            const address = results[0].formatted_address;
-                            console.log("Geocoded address:", address);
-                            resolve(address);
+                    geocoder.geocode({ 
+                        location: { lat, lng },
+                        result_type: ['street_address', 'premise']
+                    }, (results, status) => {
+                        console.log("Geocoding status:", status);
+                        console.log("Geocoding results:", results);
+                        
+                        if (status === 'OK' && results && results.length > 0) {
+                            // Try to find the most specific address
+                            let bestAddress = null;
+                            
+                            for (let result of results) {
+                                console.log("Checking result:", result.formatted_address, "Types:", result.types);
+                                
+                                // Prefer street addresses
+                                if (result.types.includes('street_address') || 
+                                    result.types.includes('premise')) {
+                                    bestAddress = result.formatted_address;
+                                    break;
+                                }
+                            }
+                            
+                            // If no street address found, use the first result
+                            if (!bestAddress && results[0]) {
+                                bestAddress = results[0].formatted_address;
+                            }
+                            
+                            console.log("Selected address:", bestAddress);
+                            resolve(bestAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`);
                         } else {
                             console.error("Geocoding failed:", status);
-                            reject(new Error("Geocoding failed"));
+                            // Fallback to coordinates
+                            resolve(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
                         }
                     });
                 });
             } catch (error) {
                 console.error("Geocoding error:", error);
-                return null;
+                // Fallback to coordinates
+                return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             }
         }
 
