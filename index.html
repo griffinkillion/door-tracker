@@ -705,15 +705,19 @@
         let watchId = null;
         let currentPosition = null;
         let gpsRetryCount = 0;
+        let gpsInitialized = false;
         const maxRetries = 3;
 
         function initializeGPS() {
+            if (gpsInitialized) return; // Prevent multiple initializations
+            
             if (!navigator.geolocation) {
                 document.getElementById('currentLocation').innerHTML = 
                     "❌ GPS not supported by this device";
                 return;
             }
 
+            gpsInitialized = true;
             document.getElementById('currentLocation').textContent = "📍 Getting GPS location...";
 
             // Start with fast, less accurate location
@@ -730,8 +734,10 @@
                     updateLocationDisplay(position);
                     console.log("Quick GPS acquired");
                     
-                    // Now try for high accuracy
-                    getHighAccuracyLocation();
+                    // Now try for high accuracy (only once)
+                    if (gpsRetryCount === 0) {
+                        getHighAccuracyLocation();
+                    }
                 },
                 (error) => {
                     console.log("Quick GPS failed, trying high accuracy:", error.message);
@@ -742,9 +748,12 @@
         }
 
         function getHighAccuracyLocation() {
+            if (gpsRetryCount > 0) return; // Only try once
+            gpsRetryCount = 1;
+            
             const accurateOptions = {
                 enableHighAccuracy: true,
-                timeout: 15000, // Longer timeout for accurate GPS
+                timeout: 15000,
                 maximumAge: 30000
             };
 
@@ -756,7 +765,8 @@
                     console.log("High accuracy GPS acquired");
                 },
                 (error) => {
-                    handleLocationError(error);
+                    console.log("High accuracy GPS failed:", error.message);
+                    startLocationTracking(); // Start tracking with whatever we have
                 },
                 accurateOptions
             );
@@ -767,27 +777,20 @@
                 navigator.geolocation.clearWatch(watchId);
             }
 
-            // More relaxed tracking options
+            // Track location every 30 seconds
             const trackingOptions = {
                 enableHighAccuracy: true,
-                timeout: 30000, // Longer timeout for tracking
-                maximumAge: 60000 // Accept positions up to 1 minute old
+                timeout: 30000,
+                maximumAge: 30000 // Don't update more than every 30 seconds
             };
 
             watchId = navigator.geolocation.watchPosition(
                 (position) => {
                     currentPosition = position;
                     updateLocationDisplay(position);
-                    gpsRetryCount = 0; // Reset retry count on success
                 },
                 (error) => {
-                    console.log("Location tracking error:", error);
-                    
-                    // Don't spam error messages for tracking failures
-                    if (gpsRetryCount < maxRetries) {
-                        gpsRetryCount++;
-                        console.log(`GPS retry ${gpsRetryCount}/${maxRetries}`);
-                    }
+                    console.log("Location tracking error (this is normal):", error.message);
                 },
                 trackingOptions
             );
