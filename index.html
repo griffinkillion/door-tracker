@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Door Tracker - Roofing Sales</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🏠</text></svg>">
     <style>
         * {
             margin: 0;
@@ -220,9 +220,8 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         
-        .leaflet-popup-content {
+        .gm-style-iw {
             font-family: inherit;
-            font-size: 14px;
         }
         
         .popup-buttons {
@@ -239,6 +238,27 @@
             font-size: 12px;
             cursor: pointer;
             color: white;
+        }
+        
+        .api-key-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .api-key-notice strong {
+            color: #856404;
+        }
+        
+        .api-key-notice code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
         }
     </style>
 </head>
@@ -267,7 +287,13 @@
             📍 Detecting your location...
         </div>
         
-        <div class="map-container">
+        <div class="api-key-notice">
+            <strong>🗺️ Google Maps Setup Required</strong><br>
+            To enable the interactive map, add your Google Maps API key.<br>
+            <small>The app works perfectly without it - GPS tracking and list view are fully functional!</small>
+        </div>
+        
+        <div class="map-container" style="display: none;">
             <button class="map-toggle" onclick="toggleMapView()">📋 List View</button>
             <div id="map" style="height: 100%; width: 100%;"></div>
         </div>
@@ -300,8 +326,16 @@
         </button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
+        // Google Maps API Configuration
+        const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM";
+        
+        // Global variables
+        let map = null;
+        let markers = {};
+        let userLocationMarker = null;
+        let isMapView = false;
+        let googleMapsLoaded = false;
         // Sample data - in real app this would come from a database
         let addresses = [
             { id: 1, address: "1234 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7223, lng: -90.3654 } },
@@ -321,116 +355,68 @@
 
         // Status configurations
         const statusConfig = {
-            unvisited: { icon: "⚪", label: "Not visited", class: "", color: "#95a5a6" },
-            knocked: { icon: "🚪", label: "Knocked", class: "knocked", color: "#3498db" },
-            interested: { icon: "✅", label: "Interested", class: "interested", color: "#27ae60" },
-            "not-interested": { icon: "❌", label: "Not interested", class: "not-interested", color: "#e74c3c" },
-            "not-home": { icon: "🏠", label: "Not home", class: "not-home", color: "#f39c12" }
+            unvisited: { icon: "⚪", label: "Not visited", class: "", color: "#95a5a6", mapIcon: "http://maps.google.com/mapfiles/ms/icons/grey-dot.png" },
+            knocked: { icon: "🚪", label: "Knocked", class: "knocked", color: "#3498db", mapIcon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" },
+            interested: { icon: "✅", label: "Interested", class: "interested", color: "#27ae60", mapIcon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png" },
+            "not-interested": { icon: "❌", label: "Not interested", class: "not-interested", color: "#e74c3c", mapIcon: "http://maps.google.com/mapfiles/ms/icons/red-dot.png" },
+            "not-home": { icon: "🏠", label: "Not home", class: "not-home", color: "#f39c12", mapIcon: "http://maps.google.com/mapfiles/ms/icons/orange-dot.png" }
         };
 
-        function initializeMap() {
-            // Wait for the page to be fully loaded
-            setTimeout(() => {
-                try {
-                    console.log("Starting map initialization...");
-                    
-                    // Make sure the map container exists and has dimensions
-                    const mapElement = document.getElementById('map');
-                    if (!mapElement) {
-                        console.error("Map container not found");
-                        return;
-                    }
-                    
-                    // Force container to have dimensions
-                    mapElement.style.width = "100%";
-                    mapElement.style.height = "300px";
-                    
-                    // Use your actual GPS coordinates if available
-                    const defaultLat = currentPosition ? currentPosition.coords.latitude : 38.602983;
-                    const defaultLng = currentPosition ? currentPosition.coords.longitude : -90.379812;
-                    
-                    console.log(`Initializing map at: ${defaultLat}, ${defaultLng}`);
-                    
-                    // Create map
-                    map = L.map('map', {
-                        center: [defaultLat, defaultLng],
-                        zoom: 16,
-                        zoomControl: true,
-                        attributionControl: true
-                    });
-                    
-                    console.log("Map object created");
-                    
-                    // Add multiple tile layer options for reliability
-                    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap contributors',
-                        maxZoom: 19,
-                        crossOrigin: true
-                    });
-                    
-                    // Backup tile layer
-                    const cartoDB = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                        attribution: '© OpenStreetMap © CartoDB',
-                        maxZoom: 19,
-                        crossOrigin: true
-                    });
-                    
-                    // Try primary layer first
-                    osmLayer.on('tileerror', function() {
-                        console.log("OSM tiles failed, trying backup...");
-                        map.removeLayer(osmLayer);
-                        cartoDB.addTo(map);
-                    });
-                    
-                    osmLayer.addTo(map);
-                    
-                    // Add a test marker to verify map is working
-                    L.marker([defaultLat, defaultLng])
-                        .addTo(map)
-                        .bindPopup('Map Test - If you see this, the map is working!')
-                        .openPopup();
-                    
-                    console.log("Map initialized successfully");
-                    
-                    // Force map to refresh
-                    setTimeout(() => {
-                        map.invalidateSize();
-                        updateMapMarkers();
-                    }, 100);
-                    
-                } catch (error) {
-                    console.error("Map initialization error:", error);
-                    showMapFallback();
-                }
-            }, 1000); // Longer delay to ensure everything is loaded
-        }
-        
-        function showMapFallback() {
-            document.getElementById('map').innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f8f9fa; color: #666; text-align: center; padding: 20px; border: 2px dashed #ddd;">
-                    <div>
-                        <div style="font-size: 48px; margin-bottom: 15px;">🗺️</div>
-                        <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Map View Unavailable</div>
-                        <div style="margin-bottom: 15px;">The interactive map couldn't load.<br>List view is working perfectly!</div>
-                        <button onclick="retryMapLoad()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">🔄 Try Again</button>
-                        <div style="margin-top: 10px; font-size: 12px; color: #999;">GPS tracking still works in list view</div>
-                    </div>
-                </div>
-            `;
+        // Load Google Maps API dynamically
+        function loadGoogleMaps() {
+            if (GOOGLE_MAPS_API_KEY === "YOUR_API_KEY_HERE") {
+                console.log("Google Maps API key not configured");
+                return;
+            }
+            
+            if (googleMapsLoaded) return;
+            
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initializeGoogleMap`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+            googleMapsLoaded = true;
         }
 
-        function retryMapLoad() {
-            document.getElementById('map').innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">Loading map...</div>';
-            setTimeout(() => {
-                initializeMap();
-            }, 500);
+        // Initialize Google Map (called by Google Maps API)
+        function initializeGoogleMap() {
+            try {
+                console.log("Initializing Google Map...");
+                
+                const defaultLat = currentPosition ? currentPosition.coords.latitude : 38.602983;
+                const defaultLng = currentPosition ? currentPosition.coords.longitude : -90.379812;
+                
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: defaultLat, lng: defaultLng },
+                    zoom: 16,
+                    mapTypeId: 'roadmap',
+                    styles: [
+                        {
+                            featureType: 'poi',
+                            elementType: 'labels',
+                            stylers: [{ visibility: 'off' }]
+                        }
+                    ]
+                });
+                
+                console.log("Google Map initialized successfully");
+                updateGoogleMapMarkers();
+                
+                // Hide API notice and show map
+                document.querySelector('.api-key-notice').style.display = 'none';
+                document.querySelector('.map-container').style.display = 'block';
+                
+            } catch (error) {
+                console.error("Google Map initialization failed:", error);
+            }
         }
 
-        function updateMapMarkers() {
-            if (!map) return;
+        function updateGoogleMapMarkers() {
+            if (!map || !window.google) return;
             
             // Clear existing markers
-            Object.values(markers).forEach(marker => map.removeLayer(marker));
+            Object.values(markers).forEach(marker => marker.setMap(null));
             markers = {};
             
             // Add markers for each address
@@ -438,74 +424,97 @@
                 if (address.coordinates) {
                     const statusInfo = statusConfig[address.status];
                     
-                    // Create custom marker
-                    const marker = L.circleMarker([address.coordinates.lat, address.coordinates.lng], {
-                        radius: 8,
-                        fillColor: statusInfo.color,
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    }).addTo(map);
+                    const marker = new google.maps.Marker({
+                        position: { lat: address.coordinates.lat, lng: address.coordinates.lng },
+                        map: map,
+                        icon: {
+                            url: statusInfo.mapIcon,
+                            scaledSize: new google.maps.Size(32, 32)
+                        },
+                        title: address.address
+                    });
                     
-                    // Create popup content
-                    let popupContent = `
-                        <div>
+                    // Create info window content
+                    let infoContent = `
+                        <div style="padding: 10px; min-width: 200px;">
                             <strong>${address.address}</strong><br>
                             Status: ${statusInfo.label}<br>
                     `;
                     
                     if (address.rep) {
-                        popupContent += `Rep: ${address.rep}<br>`;
+                        infoContent += `Rep: ${address.rep}<br>`;
                     }
                     if (address.timestamp) {
                         const date = new Date(address.timestamp);
-                        popupContent += `Time: ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}<br>`;
+                        infoContent += `Time: ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}<br>`;
                     }
                     
-                    popupContent += `
-                            <div class="popup-buttons">
-                                <button class="popup-btn knocked" onclick="updateStatusFromMap(${address.id}, 'knocked')" style="background: #3498db;">🚪</button>
-                                <button class="popup-btn interested" onclick="updateStatusFromMap(${address.id}, 'interested')" style="background: #27ae60;">✅</button>
-                                <button class="popup-btn not-interested" onclick="updateStatusFromMap(${address.id}, 'not-interested')" style="background: #e74c3c;">❌</button>
-                                <button class="popup-btn not-home" onclick="updateStatusFromMap(${address.id}, 'not-home')" style="background: #f39c12;">🏠</button>
+                    infoContent += `
+                            <div class="popup-buttons" style="margin-top: 10px;">
+                                <button onclick="updateStatusFromMap(${address.id}, 'knocked')" style="background: #3498db; color: white; border: none; padding: 8px 12px; border-radius: 4px; margin: 2px; cursor: pointer;">🚪 Knocked</button><br>
+                                <button onclick="updateStatusFromMap(${address.id}, 'interested')" style="background: #27ae60; color: white; border: none; padding: 8px 12px; border-radius: 4px; margin: 2px; cursor: pointer;">✅ Interested</button><br>
+                                <button onclick="updateStatusFromMap(${address.id}, 'not-interested')" style="background: #e74c3c; color: white; border: none; padding: 8px 12px; border-radius: 4px; margin: 2px; cursor: pointer;">❌ Not Interested</button><br>
+                                <button onclick="updateStatusFromMap(${address.id}, 'not-home')" style="background: #f39c12; color: white; border: none; padding: 8px 12px; border-radius: 4px; margin: 2px; cursor: pointer;">🏠 Not Home</button>
                             </div>
                         </div>
                     `;
                     
-                    marker.bindPopup(popupContent);
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: infoContent
+                    });
+                    
+                    marker.addListener('click', () => {
+                        // Close other info windows
+                        Object.values(markers).forEach(m => {
+                            if (m.infoWindow) m.infoWindow.close();
+                        });
+                        infoWindow.open(map, marker);
+                    });
+                    
+                    marker.infoWindow = infoWindow;
                     markers[address.id] = marker;
                 }
             });
             
-            // Update user location marker
+            // Add user location marker
             if (currentPosition && userLocationMarker) {
-                map.removeLayer(userLocationMarker);
+                userLocationMarker.setMap(null);
             }
             
-            if (currentPosition) {
-                userLocationMarker = L.marker([currentPosition.coords.latitude, currentPosition.coords.longitude], {
-                    icon: L.divIcon({
-                        className: 'user-location-marker',
-                        html: '📍',
-                        iconSize: [20, 20],
-                        iconAnchor: [10, 10]
-                    })
-                }).addTo(map);
+            if (currentPosition && window.google) {
+                userLocationMarker = new google.maps.Marker({
+                    position: { 
+                        lat: currentPosition.coords.latitude, 
+                        lng: currentPosition.coords.longitude 
+                    },
+                    map: map,
+                    icon: {
+                        url: 'http://maps.google.com/mapfiles/ms/icons/blue-pushpin.png',
+                        scaledSize: new google.maps.Size(40, 40)
+                    },
+                    title: 'Your Location'
+                });
                 
-                userLocationMarker.bindPopup("Your current location");
+                const userInfoWindow = new google.maps.InfoWindow({
+                    content: '<div style="padding: 5px;"><strong>Your Current Location</strong></div>'
+                });
+                
+                userLocationMarker.addListener('click', () => {
+                    userInfoWindow.open(map, userLocationMarker);
+                });
             }
         }
 
         function updateStatusFromMap(id, status) {
             updateStatus(id, status);
-            updateMapMarkers(); // Refresh map colors
+            updateGoogleMapMarkers(); // Refresh map colors
         }
 
         function toggleMapView() {
             const mapContainer = document.querySelector('.map-container');
             const addressList = document.querySelector('.address-list');
             const toggleBtn = document.querySelector('.map-toggle');
+            const apiNotice = document.querySelector('.api-key-notice');
             
             console.log("Toggle button clicked", {mapContainer, addressList, toggleBtn, isMapView});
             
@@ -518,27 +527,31 @@
                 // Switch to list view
                 mapContainer.style.display = 'none';
                 addressList.style.display = 'block';
-                toggleBtn.textContent = '🗺️ Map View';
+                if (apiNotice) apiNotice.style.display = 'block';
                 isMapView = false;
                 console.log("Switched to list view");
             } else {
                 // Switch to map view
-                mapContainer.style.display = 'block';
+                if (GOOGLE_MAPS_API_KEY === "YOUR_API_KEY_HERE") {
+                    alert("Google Maps API key required for map view. The app works perfectly in list view!");
+                    return;
+                }
+                
                 addressList.style.display = 'none';
-                toggleBtn.textContent = '📋 List View';
+                if (apiNotice) apiNotice.style.display = 'none';
+                mapContainer.style.display = 'block';
                 isMapView = true;
                 console.log("Switched to map view");
                 
                 // Initialize or refresh map
                 if (!map) {
-                    console.log("Map not initialized, creating it now...");
-                    initializeMap();
+                    console.log("Loading Google Maps for first time...");
+                    loadGoogleMaps();
                 } else {
-                    // Refresh map size
+                    console.log("Refreshing existing Google Map...");
                     setTimeout(() => {
-                        console.log("Refreshing existing map...");
-                        map.invalidateSize();
-                        updateMapMarkers();
+                        google.maps.event.trigger(map, 'resize');
+                        updateGoogleMapMarkers();
                     }, 100);
                 }
             }
@@ -621,7 +634,7 @@
                 
                 renderAddresses();
                 updateStats();
-                updateMapMarkers();
+                updateGoogleMapMarkers();
                 
                 // Show success feedback
                 const button = event.target;
@@ -780,6 +793,19 @@
                 },
                 (error) => {
                     console.log("High accuracy GPS failed:", error.message);
+                    // Even if GPS fails, show that the app still works
+                    if (!currentPosition) {
+                        // Set a default location so the app still functions
+                        currentPosition = {
+                            coords: {
+                                latitude: 38.602983,
+                                longitude: -90.379812,
+                                accuracy: 1000
+                            }
+                        };
+                        document.getElementById('currentLocation').innerHTML = 
+                            `📍 GPS unavailable - using approximate location <button onclick="requestLocationPermission()" style="margin-left: 10px; padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 12px;">🔄 Try Again</button>`;
+                    }
                     startLocationTracking(); // Start tracking with whatever we have
                 },
                 accurateOptions
