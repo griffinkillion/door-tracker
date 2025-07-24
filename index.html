@@ -328,7 +328,7 @@
 
     <script>
         // Google Maps API Configuration
-        const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM";
+        const GOOGLE_MAPS_API_KEY = "AIzaSyAUINW7lyvpj_EOmu2-9v5CbqRKQGV1QFM"; // Replace with actual API key
         
         // Global variables
         let map = null;
@@ -378,12 +378,16 @@
             try {
                 console.log("Initializing Google Map...");
                 
+                // Use current GPS location if available, otherwise use default
                 const defaultLat = currentPosition ? currentPosition.coords.latitude : 38.602983;
                 const defaultLng = currentPosition ? currentPosition.coords.longitude : -90.379812;
                 
+                console.log("Map center coordinates:", defaultLat, defaultLng);
+                console.log("Using GPS location:", !!currentPosition);
+                
                 map = new google.maps.Map(document.getElementById('map'), {
                     center: { lat: defaultLat, lng: defaultLng },
-                    zoom: 16,
+                    zoom: currentPosition ? 18 : 16, // Zoom in more if we have GPS
                     mapTypeId: 'roadmap',
                     styles: [
                         {
@@ -543,6 +547,15 @@
                     loadGoogleMaps();
                 } else {
                     console.log("Refreshing existing Google Map...");
+                    // If we have GPS now, recenter the map
+                    if (currentPosition) {
+                        console.log("Recentering map to GPS location");
+                        map.setCenter({ 
+                            lat: currentPosition.coords.latitude, 
+                            lng: currentPosition.coords.longitude 
+                        });
+                        map.setZoom(18);
+                    }
                     setTimeout(() => {
                         google.maps.event.trigger(map, 'resize');
                         updateGoogleMapMarkers();
