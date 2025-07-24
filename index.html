@@ -347,12 +347,6 @@
             { id: 7, address: "1246 Oak Street", status: "unvisited", rep: "", timestamp: null, notes: "", coordinates: { lat: 38.7235, lng: -90.3666 } }
         ];
 
-        let currentRep = "";
-        let map = null;
-        let markers = {};
-        let userLocationMarker = null;
-        let isMapView = true;
-
         // Status configurations
         const statusConfig = {
             unvisited: { icon: "⚪", label: "Not visited", class: "", color: "#95a5a6", mapIcon: "http://maps.google.com/mapfiles/ms/icons/grey-dot.png" },
@@ -859,12 +853,8 @@
                 <button onclick="requestLocationPermission()" style="margin-left: 10px; padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; font-size: 12px;">🔄 Refresh</button>`;
             
             // Update map with current location
-            if (map) {
-                updateMapMarkers();
-                // Only center map on first GPS lock, not every update
-                if (gpsRetryCount === 0) {
-                    map.setView([lat, lng], 17);
-                }
+            if (map && window.google) {
+                updateGoogleMapMarkers();
             }
         }
 
@@ -895,11 +885,35 @@
         }
 
         // Initialize GPS on page load
+        console.log("Initializing door tracker app...");
         initializeGPS();
 
         // Initialize
         renderAddresses();
         updateStats();
+        
+        // Add a map view button to the stats section
+        setTimeout(() => {
+            const statsSection = document.querySelector('.stats');
+            if (statsSection && !document.querySelector('.map-view-btn')) {
+                const mapBtn = document.createElement('button');
+                mapBtn.className = 'map-view-btn';
+                mapBtn.innerHTML = '🗺️ Map View';
+                mapBtn.style.cssText = `
+                    grid-column: span 2;
+                    padding: 12px;
+                    background: linear-gradient(135deg, #3498db, #2980b9);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                `;
+                mapBtn.onclick = toggleMapView;
+                statsSection.appendChild(mapBtn);
+            }
+        }, 1000);
     </script>
 </body>
 </html>
