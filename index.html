@@ -329,46 +329,101 @@
         };
 
         function initializeMap() {
-            // Wait a moment for DOM to be ready
+            // Wait for the page to be fully loaded
             setTimeout(() => {
                 try {
-                    // Initialize map centered on GPS location or default
-                    const defaultLat = currentPosition ? currentPosition.coords.latitude : 38.7223;
-                    const defaultLng = currentPosition ? currentPosition.coords.longitude : -90.3654;
+                    console.log("Starting map initialization...");
                     
-                    map = L.map('map').setView([defaultLat, defaultLng], 16);
+                    // Make sure the map container exists and has dimensions
+                    const mapElement = document.getElementById('map');
+                    if (!mapElement) {
+                        console.error("Map container not found");
+                        return;
+                    }
                     
-                    // Add street map tiles with error handling
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    // Force container to have dimensions
+                    mapElement.style.width = "100%";
+                    mapElement.style.height = "300px";
+                    
+                    // Use your actual GPS coordinates if available
+                    const defaultLat = currentPosition ? currentPosition.coords.latitude : 38.602983;
+                    const defaultLng = currentPosition ? currentPosition.coords.longitude : -90.379812;
+                    
+                    console.log(`Initializing map at: ${defaultLat}, ${defaultLng}`);
+                    
+                    // Create map
+                    map = L.map('map', {
+                        center: [defaultLat, defaultLng],
+                        zoom: 16,
+                        zoomControl: true,
+                        attributionControl: true
+                    });
+                    
+                    console.log("Map object created");
+                    
+                    // Add multiple tile layer options for reliability
+                    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: '© OpenStreetMap contributors',
                         maxZoom: 19,
-                        errorTileUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgZmlsbD0iI2VlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5NYXAgVGlsZSBFcnJvcjwvdGV4dD48L3N2Zz4='
-                    }).addTo(map);
+                        crossOrigin: true
+                    });
                     
-                    // Add all address markers
-                    updateMapMarkers();
+                    // Backup tile layer
+                    const cartoDB = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '© OpenStreetMap © CartoDB',
+                        maxZoom: 19,
+                        crossOrigin: true
+                    });
+                    
+                    // Try primary layer first
+                    osmLayer.on('tileerror', function() {
+                        console.log("OSM tiles failed, trying backup...");
+                        map.removeLayer(osmLayer);
+                        cartoDB.addTo(map);
+                    });
+                    
+                    osmLayer.addTo(map);
+                    
+                    // Add a test marker to verify map is working
+                    L.marker([defaultLat, defaultLng])
+                        .addTo(map)
+                        .bindPopup('Map Test - If you see this, the map is working!')
+                        .openPopup();
                     
                     console.log("Map initialized successfully");
+                    
+                    // Force map to refresh
+                    setTimeout(() => {
+                        map.invalidateSize();
+                        updateMapMarkers();
+                    }, 100);
+                    
                 } catch (error) {
-                    console.error("Map initialization failed:", error);
-                    // Show fallback message
-                    document.getElementById('map').innerHTML = `
-                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f8f9fa; color: #666; text-align: center; padding: 20px;">
-                            <div>
-                                <div style="font-size: 24px; margin-bottom: 10px;">🗺️</div>
-                                <div>Map temporarily unavailable</div>
-                                <div style="font-size: 12px; margin-top: 5px;">Using list view instead</div>
-                                <button onclick="retryMapLoad()" style="margin-top: 10px; padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 6px; cursor: pointer;">🔄 Retry</button>
-                            </div>
-                        </div>
-                    `;
+                    console.error("Map initialization error:", error);
+                    showMapFallback();
                 }
-            }, 500);
+            }, 1000); // Longer delay to ensure everything is loaded
+        }
+        
+        function showMapFallback() {
+            document.getElementById('map').innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f8f9fa; color: #666; text-align: center; padding: 20px; border: 2px dashed #ddd;">
+                    <div>
+                        <div style="font-size: 48px; margin-bottom: 15px;">🗺️</div>
+                        <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Map View Unavailable</div>
+                        <div style="margin-bottom: 15px;">The interactive map couldn't load.<br>List view is working perfectly!</div>
+                        <button onclick="retryMapLoad()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">🔄 Try Again</button>
+                        <div style="margin-top: 10px; font-size: 12px; color: #999;">GPS tracking still works in list view</div>
+                    </div>
+                </div>
+            `;
         }
 
         function retryMapLoad() {
-            document.getElementById('map').innerHTML = '';
-            initializeMap();
+            document.getElementById('map').innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">Loading map...</div>';
+            setTimeout(() => {
+                initializeMap();
+            }, 500);
         }
 
         function updateMapMarkers() {
